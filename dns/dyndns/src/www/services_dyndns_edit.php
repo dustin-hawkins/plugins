@@ -27,7 +27,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-require_once("guiconfig.inc");
+	use OPNsense\DynamicDNS\Plugins\GoogleCloudDNS;
+
+	require_once("guiconfig.inc");
 require_once("interfaces.inc");
 require_once("system.inc");
 require_once("plugins.inc.d/dyndns.inc");
@@ -209,6 +211,10 @@ include("head.inc");
               case "custom-v6":
                 $(".type_custom").show();
                 break;
+			  case "gcloud":
+				  $(".type_default").hide();
+				  $(".type_gcloud").show();
+				  break;
               case "route53":
               case "route53-v6":
                 $(".type_route53").show();
@@ -382,6 +388,40 @@ include("head.inc");
                       </div>
                     </td>
                   </tr>
+				<tr class="type_gcloud">
+					<td><i class="fa fa-info-circle text-muted"></i> <?= gettext("Record Type") ?></td>
+					<td>
+						<select name="interface" class="selectpicker" id="interface">
+							<?php
+								if (!in_array($pconfig['mx'],GoogleCloudDNS::GCLOUD_RECORD_TYPES))
+									$pconfig['mx'] = 'A';
+								foreach (GoogleCloudDNS::GCLOUD_RECORD_TYPES as $type):?>
+									<option value="<?= $type ?>" <?=($pconfig['mx'] == $type )? 'selected="selected"' : '';?>>
+										<?= $type ?>
+									</option>
+								<?php
+								endforeach;?>
+						</select>
+					</td>
+				</tr>
+				<tr class="type_gcloud">
+					<td><a id="help_for_zonename" href="#" class="showhelp"><i class="fa fa-info-circle"></i></a> <?= gettext("Zone Name") ?></td>
+					<td>
+						<input name="zoneid" type="text" id="zoneid" value="<?= $pconfig['zoneid'] ?>" />
+						<div class="hidden" data-for="help_for_zonename">
+							<?= gettext("Enter Zone Name as configured in Google Cloud DNS.") ?>
+						</div>
+					</td>
+				</tr>
+				<tr class="type_gcloud">
+					<td><a id="help_for_service_account" href="#" class="showhelp"><i class="fa fa-info-circle"></i></a> <?= gettext("JSON Service Account Key") ?></td>
+					<td>
+						<textarea name="username" class="formpre" id="username" cols="65" rows="7"><?= $pconfig['username'] ?></textarea>
+						<div class="hidden" data-for="help_for_service_account">
+							NOTE: First you must create a <a target="_blank" href="https://cloud.google.com/iam/docs/creating-managing-service-account-keys">service account key</a> using the GCP Console and enable the <a target="_blank" href="https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview">Cloud Resource Manager API</a>. Afterwards paste the full JSON key in the textbox below.
+						</div>
+					</td>
+				</tr>
                   <tr class="opt_field type_route53">
                     <td><a id="help_for_zoneid" href="#" class="showhelp"><i class="fa fa-info-circle"></i></a> <?= gettext("Zone ID") ?></td>
                     <td>
@@ -428,7 +468,7 @@ include("head.inc");
                       </div>
                     </td>
                   </tr>
-                  <tr class="opt_field type_route53 type_azure type_cloudflare">
+                  <tr class="opt_field type_route53 type_azure type_cloudflare type_gcloud">
                     <td><a id="help_for_ttl" href="#" class="showhelp"><i class="fa fa-info-circle"></i></a> <?=gettext("TTL");?></td>
                     <td>
                       <input name="ttl" type="text" id="ttl" value="<?= $pconfig['ttl'] ?>" />

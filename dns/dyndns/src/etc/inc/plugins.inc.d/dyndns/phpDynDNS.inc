@@ -114,9 +114,11 @@
  * Custom DNS support by Matt Corallo
  */
 
-class updatedns
+	use OPNsense\DynamicDNS\Plugins\GoogleCloudDNS;
+
+	class updatedns
 {
-    var $_cacheFile;
+	var $_cacheFile;
     var $_cacheFile_v6;
     var $_debugFile;
     var $_UserAgent = 'User-Agent: phpDynDNS/0.7';
@@ -216,6 +218,20 @@ class updatedns
                     $this->_error(5);
                 }
                 break;
+			case 'gcloud':
+				$gcloudRecordTypes = [
+					'A','AAAA','MX','NS'
+				];
+				if (!$dnsUser) {
+					$this->_error(GoogleCloudDNS::GCLOUD_MISSING_SERVICE_ACCOUNT_ERROR);
+				} elseif (!array_key_exists('project_id', json_decode($dnsUser,1))) {
+					$this->_error(GoogleCloudDNS::GCLOUD_INVALID_SERVICE_ACCOUNT);
+				} elseif (!$dnsZoneID) {
+					$this->_error(GoogleCloudDNS::GCLOUD_MISSING_ZONE);
+				} elseif (!in_array($dnsMX,GoogleCloudDNS::GCLOUD_RECORD_TYPES)) {
+					$this->_error(GoogleCloudDNS::GCLOUD_MISSING_TYPE);
+				}
+				break;
             case 'route53':
             case 'route53-v6':
                 if (!$dnsZoneID) {
@@ -404,7 +420,7 @@ class updatedns
             log_error("Dynamic DNS ({$this->_dnsHost} via {$this->_dnsServiceList[$this->_dnsService]}): _update() starting.");
         }
 
-        if ($this->_dnsService != 'ods' and $this->_dnsService != 'route53' and $this->_dnsService != 'route53-v6') {
+        if (!in_array($this->_dnsService,['ods','route53','route53-v6','gcloud']) {
             $ch = curl_init();
             curl_setopt($ch, CURLOPT_HEADER, 0);
             curl_setopt($ch, CURLOPT_USERAGENT, $this->_UserAgent);
@@ -678,6 +694,20 @@ class updatedns
                 }
                 curl_setopt($ch, CURLOPT_URL, $server . $port . '?system=dyndns&hostname=' . $this->_dnsHost . '&myip=' . $this->_dnsIP . '&wildcard=' . $this->_dnsWildcard . '&mx=' . $this->_dnsMX . '&backmx=NO');
                 break;
+
+			case 'gcloud':
+				/* Setting Variables */
+				$hostname = $this->_dnsHost;
+				$zoneName = $this->_dnsZoneID;
+				$serviceAccount = $this->_dnsUser;
+				$newIP = $this->_dnsIP;
+				$newTTL = $this->_dnsTTL;
+				$recordType = $this->_dnsMX;
+
+				$gcloud = new GoogleCloudDNS($serviceAccount, $zoneName, $hostname, $newIP, $newTTL, $recordType);
+
+
+				break;
             case 'route53':
             case 'route53-v6':
                 /* Setting Variables */
@@ -1599,6 +1629,18 @@ class updatedns
             case 10:
                 $error = "Dynamic DNS ({$this->_dnsHost}): No change in my IP address and/or " . $this->_dnsMaxCacheAgeDays . " days has not passed. Not updating dynamic DNS entry.";
                 break;
+			case GoogleCloudDNS::GCLOUD_MISSING_SERVICE_ACCOUNT_ERROR:
+				$error = "Google Cloud DNS: (Error) Service Account Missing. Please configure a valid JSON Service Account";
+				break;
+			case GoogleCloudDNS::GCLOUD_INVALID_SERVICE_ACCOUNT:
+				$error = "Google Cloud DNS: (Error) Service Account is Invalid. Please configure a valid JSON formatted Service Account";
+				break;
+			case GoogleCloudDNS::GCLOUD_MISSING_ZONE:
+				$error = "Google Cloud DNS: (Error) Zone Name Required in the Zone ID field";
+				break;
+			case GoogleCloudDNS::GCLOUD_MISSING_TYPE:
+				$error = "Google Cloud DNS: (Error) Type is Required";
+				break;
             default:
                 $error = "Dynamic DNS: (ERROR!) Unknown Response.";
                 /* FIXME: $data isn't in scope here */

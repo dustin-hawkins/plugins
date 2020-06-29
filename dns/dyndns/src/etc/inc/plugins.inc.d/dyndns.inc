@@ -121,6 +121,7 @@ function dyndns_list()
         'eurodns' => 'EuroDNS',
         'freedns' => 'freeDNS',
         'googledomains' => 'Google Domains',
+        'gcloud' => 'Google Cloud DNS',
         'gratisdns' => 'GratisDNS',
         'he-net' => 'HE.net',
         'he-net-tunnelbroker' => 'HE.net Tunnelbroker',
@@ -178,7 +179,8 @@ function dyndns_configure_client($conf)
         $dnsID = "{$conf['id']}",
         $dnsVerboseLog = $conf['verboselog'],
         $curlIpresolveV4 = $conf['curl_ipresolve_v4'],
-        $curlSslVerifypeer = $conf['curl_ssl_verifypeer']
+        $curlSslVerifypeer = $conf['curl_ssl_verifypeer'],
+		$serviceAccount = $conf['service_account'],
     );
 }
 
