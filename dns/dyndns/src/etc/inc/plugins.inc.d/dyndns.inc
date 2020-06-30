@@ -180,7 +180,7 @@ function dyndns_configure_client($conf)
         $dnsVerboseLog = $conf['verboselog'],
         $curlIpresolveV4 = $conf['curl_ipresolve_v4'],
         $curlSslVerifypeer = $conf['curl_ssl_verifypeer'],
-		$serviceAccount = $conf['service_account'],
+		$recordType = $conf['recordtype']
     );
 }
 

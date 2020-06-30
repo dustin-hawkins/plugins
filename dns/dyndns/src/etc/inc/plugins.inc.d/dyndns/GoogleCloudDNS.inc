@@ -26,11 +26,11 @@
 		 * @param string $zoneName
 		 */
 		public function __construct($serviceAccount,$zoneName) {
-			if (!empty($serviceAccount)) {
+			if (self::isValidServiceAccountJSON($serviceAccount)) {
 				# Extract the gcloud project from the key data.
 				$this->serviceAccount = json_decode($serviceAccount);
-				$project = $this->serviceAccoun->project_id;
-				$account = $this->serviceAccoun->client_email;
+				$project = $this->serviceAccount->project_id;
+				$account = $this->serviceAccount->client_email;
 				if (empty($project)) {
 					log_error("Google Cloud DNS: unable to extract project name from Google Cloud DNS JSON key");
 					return(1);
@@ -38,7 +38,7 @@
 					log_error("Google Cloud DNS: Google Cloud DNS project name: {$project}");
 				}
 			} else {
-				log_error("Google Cloud DNS: no key for Google Cloud DNS was specified");
+				log_error("Google Cloud DNS: Invalid or Missing service account for Google Cloud DNS.");
 				return(1);
 			}
 
@@ -72,34 +72,84 @@
 				}
 			};
 			$this->addRecord($hostname, $type, $ipAddress, $ttl);
-			$this->executeTransaction();
+			return $this->executeTransaction();
 		}
 
+		public static function isValidServiceAccountJSON($json) {
+			$account = false;
+			if (empty($json))
+				return false;
+			$account = json_decode($json, $assoc=true);
+			if ($account === false)
+				return false;
 
+			$required = [
+				"type",
+				"project_id",
+				"private_key_id",
+				"private_key",
+				"client_email",
+				"client_id",
+				"auth_uri",
+				"token_uri",
+				"auth_provider_x509_cert_url",
+				"client_x509_cert_url",
+			];
+
+			if ($account['type'] != 'service_account')
+				return false;
+
+			foreach ($required as $r) {
+				if (!array_key_exists($r,$account))
+					return false;
+			}
+
+			return true;
+		}
+
+		public static function isValidRecordType ($type) {
+			return in_array(strtoupper(trim($type)),self::GCLOUD_RECORD_TYPES);
+		}
 
 		private function addRecord ($hostname, $type, $ip, $ttl) {
 			$results = self::runShellCmd("/usr/local/bin/gcloud dns record-sets transaction add {$ip} --name='{$hostname}' --type='{$type}' --ttl='{$ttl}' --zone='{$this->zoneName}' --format=json",$this->env);
-			return $results['code'] == 0;
+			if ($results['code'] !== 0) {
+				log_error("Google Cloud DNS: (Error) Starting Adding Record In Transaction: " .json_encode($results));
+			}
+			return ($results['code'] == 0);
 		}
 
 		private function remove ($hostname, $type, $ip, $ttl) {
 			$results = self::runShellCmd("/usr/local/bin/gcloud dns record-sets transaction remove {$ip} --name='{$hostname}' --type='{$type}' --ttl='{$ttl}' --zone='{$this->zoneName}' --format=json",$this->env);
-			return $results['code'] == 0;
+			if ($results['code'] !== 0) {
+				log_error("Google Cloud DNS: (Error) Removing Record In Transaction: " .json_encode($results));
+			}
+			return ($results['code'] == 0);
 		}
 
 		private function startTransaction () {
 			$results = self::runShellCmd("/usr/local/bin/gcloud dns record-sets transaction start --zone='{$this->zoneName}' --format=json",$this->env);
-			return $results['code'] == 0;
+			if ($results['code'] !== 0) {
+				log_error("Google Cloud DNS: (Error) Starting Transaction: " .json_encode($results));
+			}
+			return ($results['code'] == 0);
+
 		}
 
 		private function abortTransaction () {
 			$results = self::runShellCmd("/usr/local/bin/gcloud dns record-sets transaction abort --zone='{$this->zoneName}' --format=json",$this->env);
-			return $results['code'] == 0;
+			if ($results['code'] !== 0) {
+				log_error("Google Cloud DNS: (Error) Aborting Transaction: " .json_encode($results));
+			}
+			return ($results['code'] == 0);
 		}
 
 		private function executeTransaction () {
 			$results = self::runShellCmd("/usr/local/bin/gcloud dns record-sets transaction execute --zone='{$this->zoneName}' --format=json",$this->env);
-			return $results['code'] == 0;
+			if ($results['code'] !== 0) {
+				log_error("Google Cloud DNS: (Error) Executing Transaction: " .json_encode($results));
+			}
+			return ($results['code'] == 0);
 		}
 
 		/**

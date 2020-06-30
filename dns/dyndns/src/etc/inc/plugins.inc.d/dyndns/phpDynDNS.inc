@@ -135,6 +135,7 @@
     var $_dnsPort;
     var $_dnsUpdateURL;
     var $_dnsZoneID;
+    var $_dnsRecordType;
     var $_dnsResourceID;
     var $_dnsTTL;
     var $status;
@@ -181,7 +182,8 @@
         $dnsID = '',
         $dnsVerboseLog = false,
         $curlIpresolveV4 = false,
-        $curlSslVerifypeer = true
+        $curlSslVerifypeer = true,
+		$dnsRecordType = 'A'
     ) {
 
         /* XXX because the call stack is upside down we need to reassemble config parts here... */
@@ -219,16 +221,13 @@
                 }
                 break;
 			case 'gcloud':
-				$gcloudRecordTypes = [
-					'A','AAAA','MX','NS'
-				];
 				if (!$dnsUser) {
 					$this->_error(GoogleCloudDNS::GCLOUD_MISSING_SERVICE_ACCOUNT_ERROR);
-				} elseif (!array_key_exists('project_id', json_decode($dnsUser,1))) {
+				} elseif (!GoogleCloudDNS::isValidServiceAccountJSON($dnsUser)) {
 					$this->_error(GoogleCloudDNS::GCLOUD_INVALID_SERVICE_ACCOUNT);
 				} elseif (!$dnsZoneID) {
 					$this->_error(GoogleCloudDNS::GCLOUD_MISSING_ZONE);
-				} elseif (!in_array($dnsMX,GoogleCloudDNS::GCLOUD_RECORD_TYPES)) {
+				} elseif (!GoogleCloudDNS::isValidRecordType($dnsRecordType)) {
 					$this->_error(GoogleCloudDNS::GCLOUD_MISSING_TYPE);
 				}
 				break;
@@ -316,6 +315,7 @@
         $this->_dnsWildcard = $dnsWildcard;
         $this->_dnsMX = $dnsMX;
         $this->_dnsZoneID = $dnsZoneID;
+		$this->_dnsRecordType = $dnsRecordType;
         $this->_dnsResourceID = $dnsResourceID;
         $this->_dnsTTL = $dnsTTL;
         $this->_if = dyndns_failover_interface($dnsIf, $this->_useIPv6 ? 'inet6' : 'all');
@@ -369,6 +369,7 @@
                 case 'eurodns':
                 case 'freedns':
                 case 'googledomains':
+				case 'gcloud':
                 case 'gratisdns':
                 case 'he-net':
                 case 'he-net-tunnelbroker':
@@ -420,7 +421,7 @@
             log_error("Dynamic DNS ({$this->_dnsHost} via {$this->_dnsServiceList[$this->_dnsService]}): _update() starting.");
         }
 
-        if (!in_array($this->_dnsService,['ods','route53','route53-v6','gcloud']) {
+        if (!in_array($this->_dnsService,['ods','route53','route53-v6','gcloud'])) {
             $ch = curl_init();
             curl_setopt($ch, CURLOPT_HEADER, 0);
             curl_setopt($ch, CURLOPT_USERAGENT, $this->_UserAgent);
@@ -702,11 +703,11 @@
 				$serviceAccount = $this->_dnsUser;
 				$newIP = $this->_dnsIP;
 				$newTTL = $this->_dnsTTL;
-				$recordType = $this->_dnsMX;
+				$recordType = $this->_dnsRecordType;
 
-				$gcloud = new GoogleCloudDNS($serviceAccount, $zoneName, $hostname, $newIP, $newTTL, $recordType);
+				$gcloud = new GoogleCloudDNS($serviceAccount, $zoneName);
 
-
+				$this->_checkStatus(null,$gcloud->updateRecord($hostname, $newIP, $newTTL, $recordType));
 				break;
             case 'route53':
             case 'route53-v6':
@@ -1355,6 +1356,15 @@
                     $this->_debug($data);
                 }
                 break;
+			case 'gcloud':
+				if ($data) {
+					$status            = 'Dynamic DNS: (Success) IP Address Changed Successfully!';
+					$successful_update = true;
+				} else {
+					$status            = 'Dynamic DNS: (Error) Could not update Google Cloud DNS.';
+					$successful_update = false;
+				}
+				break;
             case 'route53':
             case 'route53-v6':
                 $successful_update = true;

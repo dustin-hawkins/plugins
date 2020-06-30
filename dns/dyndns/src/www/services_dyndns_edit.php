@@ -53,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $id = $_GET['id'];
     }
     $config_copy_fieldnames = array('username', 'password', 'host', 'mx', 'type', 'zoneid','resourceid', 'ttl', 'updateurl',
-                                    'resultmatch', 'requestif', 'descr', 'interface');
+                                    'resultmatch', 'requestif', 'descr', 'interface','recordtype');
     foreach ($config_copy_fieldnames as $fieldname) {
         if (isset($id) && isset($a_dyndns[$id][$fieldname])) {
             $pconfig[$fieldname] = $a_dyndns[$id][$fieldname];
@@ -77,7 +77,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     }
     $input_errors = array();
     $pconfig = $_POST;
-    if(($pconfig['type'] == "freedns" || $pconfig['type'] == "linode" || $pconfig['type'] == "linode-v6" || $pconfig['type'] == "namecheap" || $pconfig['type'] == "cloudflare-token" || $pconfig['type'] == "cloudflare-token-v6") && $pconfig['username'] == "") {
+
+    $providers_usernameNone = [
+    		"freedns","linode",'linode-v6','namecheap','couldflare-token','cloudflare-token-v6'
+	];
+
+    if(in_array($pconfig['type'],$providers_usernameNone) && $pconfig['username'] == "") {
         $pconfig['username'] = "none";
     }
 
@@ -94,16 +99,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $reqdfieldsn[] = gettext('Resource Id');
         $reqdfields[] = 'ttl';
         $reqdfieldsn[] = gettext('TTL');
-    } elseif ($pconfig['type'] != 'custom' && $pconfig['type'] != 'custom-v6') {
-        $reqdfields[] = 'host';
-        $reqdfieldsn[] = gettext('Hostname');
-        $reqdfields[] = 'username';
-        $reqdfieldsn[] = gettext('Username');
-        if (!in_array($pconfig['type'], array('dynv6', 'dynv6-v6', 'duckdns', 'regfish', 'regfish-v6'))) {
-            $reqdfields[] = 'password';
-            $reqdfieldsn[] = gettext('Password');
-        }
-    } else {
+	} elseif ($pconfig['type'] == 'gcloud') {
+
+    	$reqdfields[]  = 'host';
+		$reqdfieldsn[] = gettext('Hostname');
+		$reqdfields[]  = 'username';
+		$reqdfieldsn[] = gettext('Username');
+		$reqdfields[] = 'recordtype';
+		$reqdfieldsn[] = gettext('Record Type');
+		$reqdfields[] = 'ttl';
+		$reqdfieldsn[] = gettext('TTL');
+
+	} elseif ($pconfig['type'] != 'custom' && $pconfig['type'] != 'custom-v6') {
+		$reqdfields[]  = 'host';
+		$reqdfieldsn[] = gettext('Hostname');
+		$reqdfields[]  = 'username';
+		$reqdfieldsn[] = gettext('Username');
+		if(!in_array($pconfig['type'], ['dynv6', 'dynv6-v6', 'duckdns', 'regfish', 'regfish-v6'])) {
+			$reqdfields[]  = 'password';
+			$reqdfieldsn[] = gettext('Password');
+		}
+	} else {
         $reqdfields[] = 'updateurl';
         $reqdfieldsn[] = gettext('Update URL');
     }
@@ -393,10 +409,10 @@ include("head.inc");
 					<td>
 						<select name="interface" class="selectpicker" id="interface">
 							<?php
-								if (!in_array($pconfig['mx'],GoogleCloudDNS::GCLOUD_RECORD_TYPES))
-									$pconfig['mx'] = 'A';
+								if (!in_array($pconfig['recordtype'],GoogleCloudDNS::GCLOUD_RECORD_TYPES))
+									$pconfig['recordtype'] = 'A';
 								foreach (GoogleCloudDNS::GCLOUD_RECORD_TYPES as $type):?>
-									<option value="<?= $type ?>" <?=($pconfig['mx'] == $type )? 'selected="selected"' : '';?>>
+									<option value="<?= $type ?>" <?=($pconfig['recordtype'] == $type )? 'selected="selected"' : '';?>>
 										<?= $type ?>
 									</option>
 								<?php
